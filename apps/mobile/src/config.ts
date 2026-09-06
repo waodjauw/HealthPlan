@@ -8,4 +8,4 @@
  * 注意：安卓 9+ 默认禁止明文 HTTP。开发阶段已在 app.json 里开了
  * android.usesCleartextTraffic = true；上生产请换成 HTTPS。
  */
-export const API_BASE = 'http://10.0.2.2:3000'
+export const API_BASE = 'https://healthplan-api.onrender.com'
