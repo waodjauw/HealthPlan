@@ -9,13 +9,13 @@
 
 ## 技术选型
 
-| 层 | 选型 |
-|---|---|
-| 包管理 | yarn 4 workspaces（`nodeLinker: node-modules`） |
+| 层              | 选型                                                        |
+| --------------- | ----------------------------------------------------------- |
+| 包管理          | yarn 4 workspaces（`nodeLinker: node-modules`）             |
 | `packages/core` | 纯 TypeScript：领域类型、营养计算、中文搜索、内置食物数据集 |
-| `apps/api` | NestJS + Prisma + PostgreSQL（P2，已完成） |
-| `apps/web` | Vite + React 18 + TS + Tailwind（P3，已完成） |
-| `apps/mobile` | Expo SDK 57 (React Native 0.86)（P4，已完成） |
+| `apps/api`      | NestJS + Prisma + PostgreSQL（P2，已完成）                  |
+| `apps/web`      | Vite + React 18 + TS + Tailwind（P3，已完成）               |
+| `apps/mobile`   | Expo SDK 57 (React Native 0.86)（P4，已完成）               |
 
 `core` 是两端共用的地基：营养计算、搜索匹配、食物数据结构只写一份，Web 和安卓都 import 它。
 
@@ -54,25 +54,30 @@ cd apps/mobile && yarn start   # 手机装 Expo Go 扫码，或按 a 起模拟�
 
 ## 当前进度
 
-| 阶段 | 内容 | 状态 |
-|---|---|---|
-| P0 | Monorepo 骨架 | 完成 |
-| P1 | core + 内置食物数据集 | 完成（232 条，32 个单测全绿） |
-| P2 | NestJS API | 完成（Auth + Foods + Logs + Summary） |
-| P3 | Web 端 | 完成（登录/注册/记录/汇总/响应式/暗色） |
-| P4 | 安卓端 | 完成（Expo RN，代码 + 类型检查 + Metro 打包验证） |
+| 阶段 | 内容                  | 状态                                              |
+| ---- | --------------------- | ------------------------------------------------- |
+| P0   | Monorepo 骨架         | 完成                                              |
+| P1   | core + 内置食物数据集 | 完成（232 条，32 个单测全绿）                     |
+| P2   | NestJS API            | 完成（Auth + Foods + Logs + Summary）             |
+| P3   | Web 端                | 完成（登录/注册/记录/汇总/响应式/暗色）           |
+| P4   | 安卓端                | 完成（Expo RN，代码 + 类型检查 + Metro 打包验证） |
 
 ## core 用法示例
 
 ```ts
-import { BUILTIN_FOODS, searchFoods, calcNutrition, summarizeDay } from '@healthplan/core'
+import {
+  BUILTIN_FOODS,
+  searchFoods,
+  calcNutrition,
+  summarizeDay,
+} from "@healthplan/core";
 
-const [food] = searchFoods(BUILTIN_FOODS, '宫保鸡丁')   // 也支持 'gbjd'
-const nutrition = calcNutrition(food.per100g, 300)       // { kcal: 390, carbs: 24, protein: 36, fat: 21 }
+const [food] = searchFoods(BUILTIN_FOODS, "宫保鸡丁"); // 也支持 'gbjd'
+const nutrition = calcNutrition(food.per100g, 300); // { kcal: 390, carbs: 24, protein: 36, fat: 21 }
 
-const summary = summarizeDay(entries, '2026-09-05')
-summary.total.kcal   // 当日总热量
-summary.share        // { carbs: 50, protein: 20, fat: 30 } 供能占比，总和 100
+const summary = summarizeDay(entries, "2026-09-05");
+summary.total.kcal; // 当日总热量
+summary.share; // { carbs: 50, protein: 20, fat: 30 } 供能占比，总和 100
 ```
 
 ## 数据来源与免责
