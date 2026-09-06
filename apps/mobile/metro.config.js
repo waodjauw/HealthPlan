@@ -13,6 +13,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ]
-config.resolver.disableHierarchicalLookup = true
+// 注意：不能用 disableHierarchicalLookup=true —— pnpm 布局下 expo 的
+// 隐式依赖（expo-asset 等）位于 .pnpm/<pkg>/node_modules，需允许层级上溯解析。
+// config.resolver.disableHierarchicalLookup = true
 
 module.exports = config
