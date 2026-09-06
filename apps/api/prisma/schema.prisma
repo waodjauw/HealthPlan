@@ -1,0 +1,57 @@
+// HealthPlan 数据库 schema
+// 目标数据库：PostgreSQL（Neon 免费版 / 任意 Postgres）
+// 说明：
+// - Food.aliases / per100g / servings 用 Postgres 原生类型（String[] / Json）
+// - FoodLog.nutrition 为记录时的快照（按克数算好的碳蛋脂），历史不可变
+// - 日期统一用 'YYYY-MM-DD' 字符串，避免时区错乱
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  username     String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  foods        Food[]
+  logs         FoodLog[]
+}
+
+model Food {
+  id        String   @id @default(cuid())
+  name      String
+  aliases   String[]
+  category  String
+  per100g   Json
+  servings  Json
+  source    String   @default("user") // system | user
+  ownerId   String?
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  origin    String?
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([name])
+}
+
+model FoodLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodId    String
+  foodName  String
+  category  String
+  date      String
+  grams     Float
+  nutrition Json
+  createdAt DateTime @default(now())
+
+  @@index([userId, date])
+}

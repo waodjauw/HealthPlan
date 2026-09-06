@@ -1,0 +1,19 @@
+{
+  "name": "healthplan",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "core:test": "pnpm --filter @healthplan/core test",
+    "core:typecheck": "pnpm --filter @healthplan/core typecheck",
+    "test": "pnpm --filter @healthplan/core test",
+    "typecheck": "pnpm --filter @healthplan/core typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "HealthPlan",
+    "slug": "healthplan",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0F6E56"
+    },
+    "android": {
+      "package": "com.laodan.healthplan",
+      "versionCode": 1,
+      "usesCleartextTraffic": true
+    },
+    "ios": {
+      "bundleIdentifier": "com.laodan.healthplan"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}

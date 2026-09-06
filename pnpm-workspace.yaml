@@ -1,0 +1,30 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+# ===== pnpm v11 配置（v11 起 .npmrc 只读 registry/auth，其余必须写这里，驼峰键） =====
+
+# 布局：用 pnpm 默认 isolated（虚拟 store + 符号链接）。
+# hoisted 曾用于绕开 symlink UNKNOWN，但 v11 hoisted 下 workspace 包(core)被建为空目录而非链接（实测），
+# 且 isolated 是 pnpm 正统布局。true symlink 报 UNKNOWN 的问题已通过 pnpm.mjs 补丁
+# （UNKNOWN → fallback junction，junction 本环境 100% 成功）解决。
+# nodeLinker: hoisted
+
+# workspace 本地包（core↔apps）默认 symlink 链接。
+# 本环境 true symlink 报 UNKNOWN，已通过补丁 pnpm.mjs 使失败自动 fallback 到 junction（100% 成功）。
+# injectWorkspacePackages 方案曾尝试（硬链接注入），但注入结果为空目录+仅 .ignored_* 残留，已废弃。
+# injectWorkspacePackages: false
+
+# 默认 store 在 D:\.pnpm-store（同卷、已有 892 包缓存），保持默认即可
+# storeDir: D:\.pnpm-store
+
+# v11 用 allowBuilds 取代 onlyBuiltDependencies：放行需要构建脚本的包
+allowBuilds:
+  esbuild: true
+  prisma: true
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@nestjs/core': true
+  react-native: true
+  expo: true
+  expo-modules-autolinking: true
