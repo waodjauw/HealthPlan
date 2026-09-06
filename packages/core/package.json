@@ -17,6 +17,7 @@
     "dist"
   ],
   "scripts": {
+    "prepare": "pnpm build",
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.build.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type:'module'}))\"",
     "watch": "tsc -p tsconfig.build.json --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",

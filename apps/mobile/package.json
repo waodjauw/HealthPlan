@@ -5,6 +5,7 @@
   "main": "expo/AppEntry.js",
   "scripts": {
     "start": "expo start",
+    "eas-build-post-install": "cd ../.. && (pnpm --filter @healthplan/core build || npx --yes pnpm@11.25.0 --filter @healthplan/core build)",
     "android": "expo run:android",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit"
