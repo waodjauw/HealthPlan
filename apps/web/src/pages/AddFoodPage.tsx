@@ -772,10 +772,6 @@ function CreateFoodForm({
             />
           </label>
         </div>
-        <p className="mt-1.5 text-xs text-slate-400">
-          填了份数信息后，以后添加这个食物会默认使用该克数
-        </p>
-
         <div className="mt-3 grid grid-cols-2 gap-2.5">
           {(
             [

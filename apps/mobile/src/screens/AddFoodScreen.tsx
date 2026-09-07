@@ -381,10 +381,6 @@ export function AddFoodScreen({ navigation, route }: Props) {
                 />
               </View>
             </View>
-            <Text style={[styles.createHint, { color: muted, marginTop: -4 }]}>
-              填了之后，以后添加这个食物默认就用该克数（填 0 则默认 100g）
-            </Text>
-
             <Text style={[styles.fieldLabel, { color: muted }]}>每 100g 营养（可留 0）</Text>
             <View style={styles.nutriRow}>
               {(
