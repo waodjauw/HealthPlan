@@ -48,6 +48,8 @@ function totalGramsOf(c: CartItem): number {
 const EMPTY_FORM = {
   name: '',
   category: 'dish' as FoodCategoryCode,
+  unit: '',
+  unitGrams: '',
   kcal: '',
   carbs: '',
   protein: '',
@@ -141,6 +143,7 @@ export function AddFoodPage() {
     if (!form.name.trim()) return
     setCreating(true)
     try {
+      const unitGrams = num(form.unitGrams)
       const food = await foodsApi.create({
         name: form.name.trim(),
         category: form.category,
@@ -150,11 +153,21 @@ export function AddFoodPage() {
           protein: num(form.protein),
           fat: num(form.fat),
         },
+        servings:
+          unitGrams > 0
+            ? [
+                {
+                  label: `1${form.unit.trim() || '份'}`,
+                  grams: unitGrams,
+                  isDefault: true,
+                },
+              ]
+            : [],
       })
       setCatalog((prev) => [food, ...prev])
       setCreateOpen(false)
       setForm(EMPTY_FORM)
-      addToCart(food, 1, 100)
+      addToCart(food, 1, defaultGrams(food))
       setTab('mine')
       setQ('')
     } finally {
@@ -735,6 +748,33 @@ function CreateFoodForm({
             ))}
           </select>
         </label>
+
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+            📏 单个单位名称
+            <input
+              value={form.unit}
+              onChange={(e) => setForm({ ...form, unit: e.target.value })}
+              placeholder="如：个、份、杯"
+              maxLength={4}
+              className={inputCls}
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+            ⚖️ 1个(份)约多少克
+            <input
+              type="number"
+              min={0}
+              value={form.unitGrams}
+              onChange={(e) => setForm({ ...form, unitGrams: e.target.value })}
+              placeholder="填 0 则默认 100g"
+              className={inputCls}
+            />
+          </label>
+        </div>
+        <p className="mt-1.5 text-xs text-slate-400">
+          填了份数信息后，以后添加这个食物会默认使用该克数
+        </p>
 
         <div className="mt-3 grid grid-cols-2 gap-2.5">
           {(

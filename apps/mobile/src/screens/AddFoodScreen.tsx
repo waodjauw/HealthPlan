@@ -61,6 +61,8 @@ const TABS: { key: TabKey; label: string; icon?: string }[] = [
 const EMPTY_FORM = {
   name: '',
   category: 'dish' as FoodCategoryCode,
+  unit: '',
+  unitGrams: '',
   kcal: '',
   carbs: '',
   protein: '',
@@ -161,6 +163,7 @@ export function AddFoodScreen({ navigation, route }: Props) {
     if (!form.name.trim()) return
     setCreating(true)
     try {
+      const unitGrams = num(form.unitGrams)
       const food = await foodsApi.create({
         name: form.name.trim(),
         category: form.category,
@@ -170,11 +173,21 @@ export function AddFoodScreen({ navigation, route }: Props) {
           protein: num(form.protein),
           fat: num(form.fat),
         },
+        servings:
+          unitGrams > 0
+            ? [
+                {
+                  label: `1${form.unit.trim() || '份'}`,
+                  grams: unitGrams,
+                  isDefault: true,
+                },
+              ]
+            : [],
       })
       setCatalog((prev) => [food, ...prev])
       setCreateOpen(false)
       setForm(EMPTY_FORM)
-      addToCart(food, 1, 100)
+      addToCart(food, 1, defaultGrams(food))
       setTab('mine')
       setQ('')
       setMenuVersion((v) => v + 1) // 重挂列表：回到顶部并可见新条目
@@ -344,6 +357,33 @@ export function AddFoodScreen({ navigation, route }: Props) {
                 )
               })}
             </View>
+
+            <Text style={[styles.fieldLabel, { color: muted }]}>份数信息（选填）</Text>
+            <View style={styles.nutriRow}>
+              <View style={styles.nutriItem}>
+                <TextInput
+                  style={inputStyle}
+                  value={form.unit}
+                  onChangeText={(t) => setForm((f) => ({ ...f, unit: t }))}
+                  placeholder="单位（个/份/杯）"
+                  placeholderTextColor={colors.placeholder}
+                  maxLength={4}
+                />
+              </View>
+              <View style={styles.nutriItem}>
+                <TextInput
+                  style={inputStyle}
+                  value={form.unitGrams}
+                  onChangeText={(t) => setForm((f) => ({ ...f, unitGrams: t }))}
+                  keyboardType="numeric"
+                  placeholder="1份约多少克"
+                  placeholderTextColor={colors.placeholder}
+                />
+              </View>
+            </View>
+            <Text style={[styles.createHint, { color: muted, marginTop: -4 }]}>
+              填了之后，以后添加这个食物默认就用该克数（填 0 则默认 100g）
+            </Text>
 
             <Text style={[styles.fieldLabel, { color: muted }]}>每 100g 营养（可留 0）</Text>
             <View style={styles.nutriRow}>
