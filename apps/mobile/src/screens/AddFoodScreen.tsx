@@ -29,7 +29,12 @@ type TabKey = 'all' | 'mine' | FoodCategoryCode
 
 interface CartItem {
   food: Food
-  grams: number
+  count: number // 个数 / 份数
+  perGrams: number // 单个（每份）克数
+}
+
+function totalGramsOf(c: CartItem): number {
+  return c.count * c.perGrams
 }
 
 const QUICK_WORDS = [
@@ -65,6 +70,11 @@ const EMPTY_FORM = {
 function defaultGrams(food: Food): number {
   const def = food.servings?.find((s) => s.isDefault) ?? food.servings?.[0]
   return def?.grams ?? 100
+}
+
+function clampCount(n: number): number {
+  if (!Number.isFinite(n)) return 1
+  return Math.min(99, Math.max(1, Math.round(n)))
 }
 
 function numOf(v: string): number {
@@ -116,17 +126,19 @@ export function AddFoodScreen({ navigation, route }: Props) {
         ? mine
         : catalog.filter((f) => f.category === tab)
 
-  function addToCart(food: Food, grams: number) {
-    const g = numOf(String(grams))
+  function addToCart(food: Food, count: number, perGrams: number) {
+    const c = clampCount(count)
+    const g = numOf(String(perGrams))
     if (g <= 0) return
     setCart((prev) => {
-      const idx = prev.findIndex((c) => c.food.id === food.id)
+      const idx = prev.findIndex((x) => x.food.id === food.id)
+      const item: CartItem = { food, count: c, perGrams: g }
       if (idx >= 0) {
         const next = [...prev]
-        next[idx] = { food, grams: g }
+        next[idx] = item
         return next
       }
-      return [...prev, { food, grams: g }]
+      return [...prev, item]
     })
   }
 
@@ -134,12 +146,12 @@ export function AddFoodScreen({ navigation, route }: Props) {
     setCart((prev) => prev.filter((c) => c.food.id !== foodId))
   }
 
-  function cartGramsOf(foodId: string): number | null {
-    return cart.find((c) => c.food.id === foodId)?.grams ?? null
+  function cartItemOf(foodId: string): CartItem | null {
+    return cart.find((c) => c.food.id === foodId) ?? null
   }
 
   const totalKcal = cart.reduce(
-    (s, c) => s + calcNutrition(c.food.per100g, c.grams).kcal,
+    (s, c) => s + calcNutrition(c.food.per100g, totalGramsOf(c)).kcal,
     0,
   )
 
@@ -162,7 +174,7 @@ export function AddFoodScreen({ navigation, route }: Props) {
       setCatalog((prev) => [food, ...prev])
       setCreateOpen(false)
       setForm(EMPTY_FORM)
-      addToCart(food, 100)
+      addToCart(food, 1, 100)
       setTab('mine')
       setQ('')
       setMenuVersion((v) => v + 1) // 重挂列表：回到顶部并可见新条目
@@ -177,7 +189,7 @@ export function AddFoodScreen({ navigation, route }: Props) {
     try {
       await Promise.all(
         cart.map((c) =>
-          logsApi.create({ foodId: c.food.id, date, grams: c.grams }),
+          logsApi.create({ foodId: c.food.id, date, grams: totalGramsOf(c) }),
         ),
       )
       navigation.goBack()
@@ -425,7 +437,7 @@ export function AddFoodScreen({ navigation, route }: Props) {
               key={f.id}
               food={f}
               colors={colors}
-              inCartGrams={cartGramsOf(f.id)}
+              inCart={cartItemOf(f.id)}
               onAdd={addToCart}
               onRemoveFromCart={removeFromCart}
               onRemoveFood={(food) =>
@@ -470,7 +482,7 @@ export function AddFoodScreen({ navigation, route }: Props) {
                   onPress={() => removeFromCart(c.food.id)}
                 >
                   <Text style={[styles.cartChipText, { color: body }]}>
-                    {c.food.name} {c.grams}g ✕
+                    {c.food.name} {c.count}×{c.perGrams}g ✕
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -500,29 +512,42 @@ export function AddFoodScreen({ navigation, route }: Props) {
 function FoodRow({
   food,
   colors,
-  inCartGrams,
+  inCart,
   onAdd,
   onRemoveFromCart,
   onRemoveFood,
 }: {
   food: Food
   colors: ReturnType<typeof useTheme>['colors']
-  inCartGrams: number | null
-  onAdd: (food: Food, grams: number) => void
+  inCart: CartItem | null
+  onAdd: (food: Food, count: number, perGrams: number) => void
   onRemoveFromCart: (foodId: string) => void
   onRemoveFood: (food: Food) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [gText, setGText] = useState(String(inCartGrams ?? defaultGrams(food)))
+  const [countText, setCountText] = useState(String(inCart?.count ?? 1))
+  const [perGText, setPerGText] = useState(String(inCart?.perGrams ?? defaultGrams(food)))
   const { divider, cardAlt, text, muted, body, primary, primaryText, primaryFill } = colors
 
-  const g = numOf(gText)
+  const count = clampCount(numOf(countText) || 1)
+  const perG = numOf(perGText)
+  const g = count * perG
   const preview = g > 0 ? calcNutrition(food.per100g, g) : null
   const servings = food.servings ?? []
 
   function toggleOpen() {
-    setGText(String(inCartGrams ?? defaultGrams(food)))
+    setCountText(String(inCart?.count ?? 1))
+    setPerGText(String(inCart?.perGrams ?? defaultGrams(food)))
     setOpen((o) => !o)
+  }
+
+  function bumpCount(delta: number) {
+    setCountText(String(clampCount(count + delta)))
+  }
+
+  function pickServing(grams: number) {
+    setCountText('1')
+    setPerGText(String(grams))
   }
 
   return (
@@ -551,16 +576,16 @@ function FoodRow({
           </Text>
         </View>
 
-        {inCartGrams != null ? (
+        {inCart != null ? (
           <View style={[styles.inCart, { backgroundColor: primaryFill }]}>
             <Text style={[styles.inCartText, { color: primaryText }]}>
-              ✓ {inCartGrams}g
+              ✓ {inCart.count}×{inCart.perGrams}g
             </Text>
           </View>
         ) : (
           <TouchableOpacity
             style={[styles.addFab, { borderColor: primary }]}
-            onPress={() => onAdd(food, defaultGrams(food))}
+            onPress={() => onAdd(food, 1, defaultGrams(food))}
             hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <Text style={[styles.addFabText, { color: primary }]}>＋</Text>
@@ -571,42 +596,87 @@ function FoodRow({
       {/* 展开份量面板 */}
       {open && (
         <View style={[styles.expand, { backgroundColor: colors.card, borderColor: divider }]}>
+          {/* 快捷份量：一种份量 = 数量 1 × 该克数 */}
+          <Text style={[styles.expTitle, { color: muted }]}>快捷份量</Text>
           <View style={styles.servingRow}>
-            {servings.map((s) => (
-              <TouchableOpacity
-                key={s.label}
-                style={[
-                  styles.servingBtn,
-                  { backgroundColor: String(s.grams) === gText ? primary : colors.card },
-                ]}
-                onPress={() => setGText(String(s.grams))}
-              >
-                <Text style={[styles.servingText, { color: String(s.grams) === gText ? '#FFFFFF' : body }]}>
-                  {s.label} {s.grams}g
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {servings.map((s) => {
+              const active = count === 1 && perG === s.grams
+              return (
+                <TouchableOpacity
+                  key={s.label}
+                  style={[
+                    styles.servingBtn,
+                    { backgroundColor: active ? primary : colors.card },
+                  ]}
+                  onPress={() => pickServing(s.grams)}
+                >
+                  <Text
+                    style={[
+                      styles.servingText,
+                      { color: active ? '#FFFFFF' : body },
+                    ]}
+                  >
+                    {s.label} {s.grams}g
+                  </Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
 
+          {/* 数量 */}
+          <View style={styles.countRow}>
+            <Text style={[styles.gramLabel, { color: muted }]}>数量</Text>
+            <TouchableOpacity
+              style={[styles.countBtn, { backgroundColor: colors.card }]}
+              onPress={() => bumpCount(-1)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={[styles.countBtnText, { color: text }]}>−</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.countInput, { backgroundColor: colors.card, color: text }]}
+              value={countText}
+              onChangeText={(v) => setCountText(v.replace(/[^0-9]/g, ''))}
+              keyboardType="number-pad"
+              placeholderTextColor={colors.placeholder}
+            />
+            <TouchableOpacity
+              style={[styles.countBtn, { backgroundColor: colors.card }]}
+              onPress={() => bumpCount(1)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={[styles.countBtnText, { color: text }]}>＋</Text>
+            </TouchableOpacity>
+            <Text style={[styles.gramUnit, { color: muted }]}>份</Text>
+          </View>
+
+          {/* 单个克数 */}
           <View style={styles.gramRow}>
-            <Text style={[styles.gramLabel, { color: muted }]}>克数</Text>
+            <Text style={[styles.gramLabel, { color: muted }]}>单个</Text>
             <TextInput
               style={[styles.gramInput, { backgroundColor: colors.card, color: text }]}
-              value={gText}
-              onChangeText={setGText}
-              keyboardType="numeric"
+              value={perGText}
+              onChangeText={(v) => setPerGText(v.replace(/[^0-9.]/g, ''))}
+              keyboardType="decimal-pad"
               placeholderTextColor={colors.placeholder}
             />
             <Text style={[styles.gramUnit, { color: muted }]}>g</Text>
+          </View>
+
+          {/* 合计预览 */}
+          <View style={styles.totalLine}>
+            <Text style={[styles.totalText, { color: muted }]}>
+              共 {count}×{perG > 0 ? perG : 0} = {g > 0 ? g : 0}g
+            </Text>
             {preview && (
-              <Text style={[styles.preview, { color: muted }]} numberOfLines={1}>
+              <Text style={[styles.previewKcal, { color: primary }]}>
                 约 {fmtKcal(preview.kcal)} kcal
               </Text>
             )}
           </View>
 
           <View style={styles.expandActions}>
-            {inCartGrams != null && (
+            {inCart != null && (
               <TouchableOpacity
                 style={[styles.expBtnGhost, { borderColor: divider }]}
                 onPress={() => {
@@ -645,14 +715,14 @@ function FoodRow({
               style={[styles.expBtnPrimary, { backgroundColor: primary }]}
               onPress={() => {
                 if (g > 0) {
-                  onAdd(food, g)
+                  onAdd(food, count, perG)
                   setOpen(false)
                 }
               }}
               disabled={g <= 0}
             >
               <Text style={styles.expBtnPrimaryText}>
-                {inCartGrams != null ? `更新克数 ${g}g` : `加入已选 ${g}g`}
+                {inCart != null ? `更新：${count} 份 × ${perG}g` : `加入已选：${count} 份 × ${perG}g`}
               </Text>
             </TouchableOpacity>
           </View>
@@ -777,6 +847,41 @@ const styles = StyleSheet.create({
   servingRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   servingBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999 },
   servingText: { fontSize: 12, fontWeight: '500' },
+  expTitle: { fontSize: 11, marginBottom: 8, fontWeight: '500' },
+  countRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  countBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBtnText: { fontSize: 20, lineHeight: 22 },
+  countInput: {
+    width: 58,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  totalLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(127,127,127,0.2)',
+  },
+  totalText: { fontSize: 12 },
+  previewKcal: { fontSize: 13, fontWeight: '700' },
   gramRow: {
     flexDirection: 'row',
     alignItems: 'center',

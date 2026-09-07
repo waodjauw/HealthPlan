@@ -39,7 +39,11 @@ const TABS = [
 type TabKey = 'all' | 'mine' | FoodCategoryCode
 interface CartItem {
   food: Food
-  grams: number
+  count: number // 个数 / 份数
+  perGrams: number // 单个（每份）克数
+}
+function totalGramsOf(c: CartItem): number {
+  return c.count * c.perGrams
 }
 const EMPTY_FORM = {
   name: '',
@@ -57,6 +61,10 @@ function defaultGrams(food: Food): number {
 function numOf(v: string): number {
   const n = Number(v)
   return Number.isFinite(n) && n > 0 ? n : 0
+}
+function clampCount(n: number): number {
+  if (!Number.isFinite(n)) return 1
+  return Math.min(99, Math.max(1, Math.round(n)))
 }
 
 export function AddFoodPage() {
@@ -107,22 +115,24 @@ export function AddFoodPage() {
         ? mine
         : catalog.filter((f) => f.category === tab)
 
-  function addToCart(food: Food, grams: number) {
-    const g = numOf(String(grams))
+  function addToCart(food: Food, count: number, perGrams: number) {
+    const c = clampCount(count)
+    const g = numOf(String(perGrams))
     if (g <= 0) return
     setCart((prev) => {
-      const i = prev.findIndex((c) => c.food.id === food.id)
+      const i = prev.findIndex((x) => x.food.id === food.id)
+      const item: CartItem = { food, count: c, perGrams: g }
       if (i >= 0) {
         const next = [...prev]
-        next[i] = { food, grams: g }
+        next[i] = item
         return next
       }
-      return [...prev, { food, grams: g }]
+      return [...prev, item]
     })
   }
 
   const totalKcal = cart.reduce(
-    (s, c) => s + calcNutrition(c.food.per100g, c.grams).kcal,
+    (s, c) => s + calcNutrition(c.food.per100g, totalGramsOf(c)).kcal,
     0,
   )
   const num = (v: string) => (v === '' ? 0 : Number(v))
@@ -144,7 +154,7 @@ export function AddFoodPage() {
       setCatalog((prev) => [food, ...prev])
       setCreateOpen(false)
       setForm(EMPTY_FORM)
-      addToCart(food, 100)
+      addToCart(food, 1, 100)
       setTab('mine')
       setQ('')
     } finally {
@@ -157,7 +167,9 @@ export function AddFoodPage() {
     setSubmitting(true)
     try {
       await Promise.all(
-        cart.map((c) => logsApi.create({ foodId: c.food.id, date, grams: c.grams })),
+        cart.map((c) =>
+          logsApi.create({ foodId: c.food.id, date, grams: totalGramsOf(c) }),
+        ),
       )
       navigate('/', { replace: true })
     } catch (err) {
@@ -169,7 +181,7 @@ export function AddFoodPage() {
     }
   }
 
-  const cartGrams = new Map(cart.map((c) => [c.food.id, c.grams]))
+  const inCartMap = new Map(cart.map((c) => [c.food.id, c]))
   const grouped = keyword || tab !== 'all'
     ? null
     : CATEGORIES.map((c) => ({
@@ -178,7 +190,7 @@ export function AddFoodPage() {
       })).filter((g) => g.foods.length > 0)
 
   const rowProps = {
-    inCartGrams: cartGrams,
+    inCartMap,
     onAdd: addToCart,
     onRemoveCart: (id: string) =>
       setCart((prev) => prev.filter((c) => c.food.id !== id)),
@@ -409,7 +421,9 @@ export function AddFoodPage() {
                 >
                   <span className="text-sm leading-none">{catMeta(c.food.category).icon}</span>
                   {c.food.name}
-                  <span className="tabular font-semibold">{c.grams}g</span>
+                  <span className="tabular font-semibold">
+                    {c.count}×{c.perGrams}g
+                  </span>
                   <span className="flex h-4 w-4 items-center justify-center rounded-full bg-white/70 text-[10px] dark:bg-slate-700">✕</span>
                 </button>
               ))}
@@ -443,29 +457,43 @@ export function AddFoodPage() {
 
 function FoodRow({
   food,
-  inCartGrams,
+  inCartMap,
   onAdd,
   onRemoveCart,
   onRemoveFood,
 }: {
   food: Food
-  inCartGrams: Map<string, number>
-  onAdd: (food: Food, grams: number) => void
+  inCartMap: Map<string, CartItem>
+  onAdd: (food: Food, count: number, perGrams: number) => void
   onRemoveCart: (id: string) => void
   onRemoveFood: (food: Food) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [gText, setGText] = useState(
-    String(inCartGrams.get(food.id) ?? defaultGrams(food)),
+  const inCart = inCartMap.get(food.id) ?? null
+  const [countText, setCountText] = useState(String(inCart?.count ?? 1))
+  const [perGText, setPerGText] = useState(
+    String(inCart?.perGrams ?? defaultGrams(food)),
   )
-  const g = numOf(gText)
+  const count = clampCount(numOf(countText) || 1)
+  const perG = numOf(perGText)
+  const g = count * perG
   const preview = g > 0 ? calcNutrition(food.per100g, g) : null
   const meta = catMeta(food.category)
-  const inCart = inCartGrams.get(food.id) ?? null
+  const servings = food.servings ?? []
 
   function toggle() {
-    setGText(String(inCartGrams.get(food.id) ?? defaultGrams(food)))
+    setCountText(String(inCart?.count ?? 1))
+    setPerGText(String(inCart?.perGrams ?? defaultGrams(food)))
     setOpen((o) => !o)
+  }
+
+  function bumpCount(delta: number) {
+    setCountText(String(clampCount(count + delta)))
+  }
+
+  function pickServing(grams: number) {
+    setCountText('1')
+    setPerGText(String(grams))
   }
 
   return (
@@ -501,7 +529,7 @@ function FoodRow({
         </span>
         {inCart != null ? (
           <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold tabular text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
-            ✓ {inCart}g
+            ✓ {inCart.count}×{inCart.perGrams}g
           </span>
         ) : (
           <span
@@ -510,12 +538,12 @@ function FoodRow({
             aria-label={`添加 ${food.name}`}
             onClick={(e) => {
               e.stopPropagation()
-              onAdd(food, defaultGrams(food))
+              onAdd(food, 1, defaultGrams(food))
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.stopPropagation()
-                onAdd(food, defaultGrams(food))
+                onAdd(food, 1, defaultGrams(food))
               }
             }}
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-[1.5px] border-emerald-600 text-base leading-none text-emerald-600 transition-all hover:bg-emerald-600 hover:text-white dark:border-emerald-400 dark:text-emerald-400 dark:hover:bg-emerald-400 dark:hover:text-emerald-950"
@@ -528,38 +556,77 @@ function FoodRow({
       {open && (
         <div className="mx-2 mb-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5 pop-in dark:border-slate-800 dark:bg-slate-800/60">
           <div className="mb-2.5 flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-300">
-            <span>⚖️</span> 选份量
+            <span>⚖️</span> 快捷份量
           </div>
-          {food.servings.length > 0 && (
-            <div className="mb-2.5 flex flex-wrap gap-1.5">
-              {food.servings.map((s) => (
-                <button
-                  key={s.label}
-                  type="button"
-                  onClick={() => setGText(String(s.grams))}
-                  className={`tap rounded-full px-3.5 py-1.5 text-xs tabular transition-all ${
-                    String(s.grams) === gText
-                      ? 'bg-primary font-semibold text-white shadow-soft dark:bg-primary-dark dark:text-emerald-950'
-                      : 'bg-white text-slate-600 shadow-soft hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300'
-                  }`}
-                >
-                  {s.label} {s.grams}g
-                </button>
-              ))}
+          {servings.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {servings.map((s) => {
+                const active = count === 1 && perG === s.grams
+                return (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => pickServing(s.grams)}
+                    className={`tap rounded-full px-3.5 py-1.5 text-xs tabular transition-all ${
+                      active
+                        ? 'bg-primary font-semibold text-white shadow-soft dark:bg-primary-dark dark:text-emerald-950'
+                        : 'bg-white text-slate-600 shadow-soft hover:bg-slate-100 dark:bg-slate-900 dark:text-slate-300'
+                    }`}
+                  >
+                    {s.label} {s.grams}g
+                  </button>
+                )
+              })}
             </div>
           )}
+          {/* 数量 */}
           <div className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-soft dark:bg-slate-900">
-            <span className="text-xs text-slate-400">克数</span>
+            <span className="w-8 text-xs text-slate-400">数量</span>
+            <button
+              type="button"
+              onClick={() => bumpCount(-1)}
+              aria-label="减一份"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-lg leading-none text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              −
+            </button>
             <input
               type="number"
               min={1}
-              value={gText}
-              onChange={(e) => setGText(e.target.value)}
+              max={99}
+              value={countText}
+              onChange={(e) => setCountText(e.target.value.replace(/[^0-9]/g, ''))}
+              className="tabular w-14 rounded-lg bg-transparent py-1 text-center text-[15px] font-bold outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => bumpCount(1)}
+              aria-label="加一份"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-lg leading-none text-slate-600 transition-colors hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              ＋
+            </button>
+            <span className="text-xs text-slate-400">份</span>
+          </div>
+          {/* 单个克数 */}
+          <div className="mt-2 flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-soft dark:bg-slate-900">
+            <span className="w-8 text-xs text-slate-400">单个</span>
+            <input
+              type="number"
+              min={1}
+              value={perGText}
+              onChange={(e) => setPerGText(e.target.value.replace(/[^0-9.]/g, ''))}
               className="tabular min-w-0 flex-1 rounded-lg bg-transparent py-1 text-center text-[15px] font-semibold outline-none"
             />
             <span className="text-xs text-slate-400">g</span>
+          </div>
+          {/* 合计 */}
+          <div className="mt-2 flex items-center justify-between border-t border-slate-200/80 px-1 pt-2 text-xs dark:border-slate-700">
+            <span className="tabular text-slate-400">
+              共 {count}×{perG > 0 ? perG : 0} = {g > 0 ? g : 0}g
+            </span>
             {preview && (
-              <span className="shrink-0 text-xs tabular font-medium text-emerald-600 dark:text-emerald-300">
+              <span className="tabular font-bold text-emerald-600 dark:text-emerald-300">
                 约 {fmtKcal(preview.kcal)} kcal
               </span>
             )}
@@ -592,13 +659,15 @@ function FoodRow({
               disabled={g <= 0}
               onClick={() => {
                 if (g > 0) {
-                  onAdd(food, g)
+                  onAdd(food, count, perG)
                   setOpen(false)
                 }
               }}
               className="tap ml-auto rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-2 text-[13px] font-semibold text-white shadow-soft transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-50 dark:from-emerald-500 dark:to-teal-500 dark:text-emerald-950"
             >
-              {inCart != null ? `更新 ${g}g` : `加入已选 ${g}g`}
+              {inCart != null
+                ? `更新：${count} 份 × ${perG}g`
+                : `加入已选：${count} 份 × ${perG}g`}
             </button>
           </div>
         </div>
