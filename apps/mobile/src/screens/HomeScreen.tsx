@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { todayISODate } from '@healthplan/core'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
@@ -26,6 +27,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Home'>
 export function HomeScreen({ navigation }: Props) {
   const { colors, toggle, isDark } = useTheme()
   const { user, logout } = useAuth()
+  const insets = useSafeAreaInsets()
   const qc = useQueryClient()
   const { width } = useWindowDimensions()
   const isTablet = width >= 768
@@ -64,7 +66,7 @@ export function HomeScreen({ navigation }: Props) {
   const todayFlag = date === today
 
   const topBar = (
-    <View style={styles.topBar}>
+    <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
       <View style={styles.brandRow}>
         <View style={[styles.logo, { backgroundColor: colors.primaryFill }]}>
           <Text style={[styles.logoText, { color: colors.primary }]}>轻</Text>
@@ -137,7 +139,7 @@ export function HomeScreen({ navigation }: Props) {
 
   const fab = (
     <TouchableOpacity
-      style={[styles.fab, { backgroundColor: colors.primary }]}
+      style={[styles.fab, { backgroundColor: colors.primary, bottom: insets.bottom + 28 }]}
       onPress={() => navigation.navigate('AddFood', { date })}
       activeOpacity={0.85}
     >
