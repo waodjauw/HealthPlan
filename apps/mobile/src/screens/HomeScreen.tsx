@@ -7,6 +7,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   ActivityIndicator,
+  Alert,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -54,7 +55,29 @@ export function HomeScreen({ navigation }: Props) {
 
   const removeMutation = useMutation({
     mutationFn: (id: string) => logsApi.remove(id),
-    onSuccess: () => {
+    // 乐观更新：先本地移除，失败再回滚
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ['logs', date] })
+      const prev = qc.getQueryData<LogItem[]>(['logs', date])
+      qc.setQueryData<LogItem[]>(
+        ['logs', date],
+        (old) => old?.filter((it) => it.id !== id) ?? [],
+      )
+      return { prev }
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['logs', date], ctx.prev)
+      const status = (_err as { response?: { status?: number } })?.response?.status
+      Alert.alert(
+        '删除失败',
+        status === 401
+          ? '登录已过期，请重新登录'
+          : status === 404
+            ? '记录不存在，可能已被删除'
+            : '网络异常，请稍后重试',
+      )
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['logs', date] })
       qc.invalidateQueries({ queryKey: ['summary', date] })
     },

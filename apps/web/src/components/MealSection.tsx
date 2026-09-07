@@ -60,10 +60,23 @@ export function MealSection({
                 aria-label={`删除 ${it.foodName}`}
                 title="删除"
                 onClick={async () => {
-                  await logsApi.remove(it.id)
-                  onChanged()
+                  try {
+                    await logsApi.remove(it.id)
+                    onChanged()
+                  } catch (err) {
+                    const status = (
+                      err as { response?: { status?: number } }
+                    )?.response?.status
+                    alert(
+                      status === 401
+                        ? '登录已过期，请重新登录'
+                        : status === 404
+                          ? '记录不存在，可能已被删除'
+                          : '删除失败：网络异常，请稍后重试',
+                    )
+                  }
                 }}
-                className="shrink-0 rounded-full px-2 py-1 text-slate-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:text-slate-600 dark:hover:bg-red-950/40"
+                className="shrink-0 rounded-full px-2 py-1 text-slate-400 transition-all hover:bg-red-50 hover:text-red-500 sm:text-slate-300 sm:opacity-0 sm:group-hover:opacity-100 dark:text-slate-500 dark:hover:bg-red-950/40 sm:dark:text-slate-600"
               >
                 ✕
               </button>

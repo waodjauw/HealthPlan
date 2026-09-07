@@ -10,7 +10,8 @@ import { API_BASE } from '../config'
 
 export const TOKEN_KEY = 'hp_token'
 
-export const api = axios.create({ baseURL: API_BASE, timeout: 15000 })
+// Render 免费档冷启动可能要 20s+，超时给足，避免删除等请求静默失败
+export const api = axios.create({ baseURL: API_BASE, timeout: 60000 })
 
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem(TOKEN_KEY)

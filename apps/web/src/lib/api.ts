@@ -8,7 +8,8 @@ import type {
 
 const base = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
 
-export const api = axios.create({ baseURL: base })
+// Render 免费档冷启动可能要 20s+，超时给足
+export const api = axios.create({ baseURL: base, timeout: 60000 })
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('hp_token')
